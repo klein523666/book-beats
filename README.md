@@ -6,6 +6,8 @@ The Web UI supports 中文 / English and runs entirely on your machine.
 
 ## Run locally
 
+On Windows, double-click [`start_book_beats.bat`](start_book_beats.bat). The first run creates the virtual environment and installs dependencies; later runs start the app directly and open the browser.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt

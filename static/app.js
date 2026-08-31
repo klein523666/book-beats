@@ -38,6 +38,13 @@
     return;
   }
 
+  const playlistForm = document.querySelector(".playlist-form");
+  playlistForm?.addEventListener("submit", () => {
+    const button = playlistForm.querySelector("button[type=submit]");
+    button.disabled = true;
+    button.textContent = button.dataset.loadingLabel;
+  });
+
   const form = document.querySelector("[data-persist-draft]");
   if (!form) return;
   const save = () => {

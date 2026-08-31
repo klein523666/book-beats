@@ -16,16 +16,27 @@ class BookBeatsTest(unittest.TestCase):
         self.assertEqual(atmosphere["name"], "Rain")
         self.assertEqual(songs[0]["artist"], "B")
 
-    @patch("main.OpenAI")
-    def test_model_request_enforces_json_output_and_language(self, openai):
+    @patch("main.requests.post")
+    def test_model_request_enforces_json_output_and_language(self, post):
         response = Mock()
-        response.choices = [Mock(message=Mock(content='{"atmosphere":{"name":"雨夜","summary":"安静"},"songs":[{"title":"A","artist":"B","why":"适合"}]}'))]
-        openai.return_value.chat.completions.create.return_value = response
+        response.json.return_value = {"choices": [{"message": {"content": '{"atmosphere":{"name":"雨夜","summary":"安静"},"songs":[{"title":"A","artist":"B","why":"适合"}]}'}}]}
+        post.return_value = response
         run = {"book_title": "书", "song_count": 1, "content_language": "zh", "model_api_key": "key", "base_url": "https://api.example.com/v1", "model_name": "model"}
         main.ask_for_songs(run, [])
-        kwargs = openai.return_value.chat.completions.create.call_args.kwargs
-        self.assertEqual(kwargs["response_format"], {"type": "json_object"})
-        self.assertIn("Simplified Chinese", kwargs["messages"][1]["content"])
+        kwargs = post.call_args.kwargs
+        self.assertEqual(post.call_args.args[0], "https://api.example.com/v1/chat/completions")
+        self.assertEqual(kwargs["json"]["response_format"], {"type": "json_object"})
+        self.assertIn("Simplified Chinese", kwargs["json"]["messages"][1]["content"])
+        self.assertEqual(kwargs["timeout"], 120)
+
+    def test_generation_timeout_has_retryable_error(self):
+        main.RUNS["run"] = {"book_title": "Book", "song_count": 1, "content_language": "zh", "model_api_key": "key", "base_url": "https://api.example.com/v1", "model_name": "model", "access_token": "token"}
+        with self.client.session_transaction() as browser_session:
+            browser_session["run_id"] = "run"
+        with patch("main.research_book", return_value=[]), patch("main.requests.post", side_effect=main.requests.Timeout("slow")):
+            response = self.client.post("/generate")
+        self.assertEqual(response.status_code, 504)
+        self.assertIn("模型响应超时", response.get_json()["error"])
 
     def test_authorize_requires_complete_form(self):
         self.assertEqual(self.client.post("/authorize", data={"book_title": "Book"}).status_code, 400)
@@ -89,6 +100,17 @@ class BookBeatsTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(post.call_args_list[0].kwargs["json"]["description"], "Mood — A quiet reading soundtrack.")
         self.assertEqual(post.call_args_list[1].args[0], "https://api.spotify.com/v1/playlists/playlist/items")
+
+    @patch("main.requests.post")
+    def test_playlist_rejects_duplicate_submission(self, post):
+        main.RUNS["run"] = {"tracks": [{"found": True, "id": "track"}], "playlist_creating": True}
+        with self.client.session_transaction() as browser_session:
+            browser_session["run_id"] = "run"
+
+        response = self.client.post("/playlist", data={"track_id": "track"})
+
+        self.assertEqual(response.status_code, 409)
+        post.assert_not_called()
 
 
 if __name__ == "__main__":
