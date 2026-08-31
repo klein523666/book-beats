@@ -27,6 +27,7 @@
 - 模型生成请求使用 `response_format={"type":"json_object"}` 强制结构化输出；生成失败时可在加载页重试，优先复用已换取的 Spotify access token。
 - 智能歌曲数量不设人工上限；Spotify `/items` 单次最多 100 首，因此创建歌单时必须按 100 首分批提交。
 - Spotify 授权回调后的检索、模型生成与歌曲匹配在 `/generating` 加载页中异步执行，必须保留阶段性提示，避免用户误以为页面卡死。
+- 2026-08-31：用户确认体验后已将功能分支推送至 Fork，并向上游提交 PR #1：https://github.com/MikePenkov/book-beats/pull/1
 
 ## 5. 工作流程与质量标准
 
